@@ -12,6 +12,7 @@ const
   REQUEST_NAME_REGISTRATION = 'registration';
   REQUEST_NAME_GET_ALL_STATIONS = 'getallstations';
   REQUEST_NAME_STATION_PARAMS = 'params';
+  REQUEST_NAME_MESSAGE = 'message';
 
   KEY_TYPE = 'type';
   KEY_USERNAME = 'username';
@@ -19,6 +20,7 @@ const
   KEY_STATUS = 'status';
   KEY_CONNECTED_FALSE = false;
   KEY_CONNECTED_TRUE = true;
+  KEY_MESSAGE = 'messageText';
 
   VALUE_SERVER = 'server';
 type
