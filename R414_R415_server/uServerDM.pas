@@ -344,6 +344,7 @@ implementation
     StrRequest : string);
   var
     Request, Response: TRequest;
+    PairedStationR414: TStationR414;
   begin
     if Length(StrRequest) > 0 then
     begin
@@ -369,8 +370,14 @@ implementation
         begin
           SendMessage(Connection, HandlerStationR414.GetAllClients);
         end
-        else
+        else if (Request.Name = REQUEST_NAME_MESSAGE) then
         begin
+        Response.Name:= REQUEST_NAME_MESSAGE;
+        Response.AddKeyValue(KEY_MESSAGE, Request.GetValue(KEY_MESSAGE));
+               PairedStationR414:= HandlerStationR414.FindByConnection(Connection).LinkedStation;
+               if not (PairedStationR414 = nil) then  begin
+                 SendMessage(PairedStationR414, Request);
+               end;
 
         end;
       except

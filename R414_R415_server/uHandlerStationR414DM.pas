@@ -38,6 +38,8 @@ type
       procedure SendDisconnectClient(StationR414: TStationR414);
       procedure SendUserNameLinkedStation(StationR414: TStationR414);
       procedure SendTypeStation(StationR414: TStationR414);
+        procedure SendChatMessage(StationR414:
+    TStationR414; Response: TRequest);
 
       property onAddStationR414: TAddRemoveUpdateStationR414Event
         read FOnAddStationR414
@@ -176,7 +178,8 @@ implementation
     StationR414 := FindByConnection(Connection);
     if (StationR414 <> nil)
       and (StationR414.LinkedStation <> nil)
-      and (StationR414.Head) then
+      //and (StationR414.Head)
+      then
     begin
       StationR414.LinkedStation.SendMessage(Request);
       Exit(True);
@@ -267,6 +270,17 @@ implementation
     end;
   end;
 
-
+      /// <summary>
+  /// Передает клиенту сообщение
+  /// </summary>
+  /// <param name="StationR414">Объект класса TStationR414.</param>
+  procedure THandlerStationR414.SendChatMessage(StationR414:
+    TStationR414; Response: TRequest);
+  begin
+    if StationR414 <> nil then
+    begin
+      StationR414.SendMessage(Response);
+    end;
+  end;
 
 end.
