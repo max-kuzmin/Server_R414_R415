@@ -24,6 +24,9 @@ type
         read FConnection write WriteConnection;
   end;
 
+  TAddRemoveUpdateClientEvent =
+      procedure(Client: TClient) of object;
+
 implementation
 
   procedure TClient.WriteConnection(Value: TIdTCPConnection);

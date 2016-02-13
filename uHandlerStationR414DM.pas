@@ -13,16 +13,15 @@ uses
   uHandlerClientDM;
 
 type
-   TAddRemoveUpdateStationR414Event =
-    procedure(StationR414: TStationR414) of object;
+
 
   THandlerStationR414 = class (THandlerClient)
     private
 
 
-      FOnAddStationR414: TAddRemoveUpdateStationR414Event;
-      FOnRemoveStationR414: TAddRemoveUpdateStationR414Event;
-      FonUpdateStationR414: TAddRemoveUpdateStationR414Event;
+      FOnAddStationR414: TAddRemoveUpdateClientEvent;
+      FOnRemoveStationR414: TAddRemoveUpdateClientEvent;
+      FonUpdateStationR414: TAddRemoveUpdateClientEvent;
 
       procedure FindLinkedStation;
     public
@@ -41,18 +40,21 @@ type
         procedure SendChatMessage(StationR414:
     TStationR414; Response: TRequest);
 
-      property onAddStationR414: TAddRemoveUpdateStationR414Event
+      property onAddStationR414: TAddRemoveUpdateClientEvent
         read FOnAddStationR414
         write FOnAddStationR414;
-      property onRemoveStationR414: TAddRemoveUpdateStationR414Event
+      property onRemoveStationR414: TAddRemoveUpdateClientEvent
         read FOnRemoveStationR414
         write FOnRemoveStationR414;
-      property onUpdateStationR414: TAddRemoveUpdateStationR414Event
+      property onUpdateStationR414: TAddRemoveUpdateClientEvent
         read FonUpdateStationR414
         write FonUpdateStationR414;
   end;
 
 implementation
+
+uses
+uCrossDM;
 
   /// <summary>
   /// ѕередает клиенту сообщение о типе клиента(главный/подчиненный).
@@ -94,6 +96,8 @@ implementation
       Request.Destroy;
     end;
   end;
+
+
 
   /// <summary>
   /// ѕередает клиенту сообщение о отключении клиента.
@@ -140,6 +144,7 @@ implementation
     Boolean;
   var
     bStation: TStationR414;
+    Request: TRequest;
   begin
     bStation := FindByConnection(Connection);
     if bStation <> nil then
@@ -149,12 +154,24 @@ implementation
       begin
         bStation.LinkedStation.Head := False;
         bStation.LinkedStation.LinkedStation := nil;
-      end;
-      if bStation.LinkedStation <> nil then
-      begin
         SendDisconnectClient(bStation);
         bStation.LinkedStation.Head := False;
         onUpdateStationR414(bStation.LinkedStation);
+      end
+
+      else if bStation.Cross <> nil then
+      begin
+          (bStation.Cross as TCross).LinkedStation := nil;
+
+          //сообщение кроссу об отключении станции
+          Request := TRequest.Create;
+          Request.Name := REQUEST_NAME_STATION_PARAMS;
+          Request.AddKeyValue(KEY_TYPE, CLIENT_STATION_R414);
+          Request.AddKeyValue(KEY_USERNAME, bStation.UserName);
+          Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_FALSE));
+          (bStation.Cross as TCross).SendMessage(Request);
+
+          onUpdateStationR414(bStation.Cross);
       end;
 
       onRemoveStationR414(bStation);
@@ -231,15 +248,14 @@ implementation
   procedure THandlerStationR414.FindLinkedStation;
   var
     i, j: Integer;
+    Request: TRequest;
   begin
     for i := 0 to Count - 1 do
     begin
-      if (Clients.Items[i] as TStationR414).LinkedStation = nil then
-      begin
         for j := 0 to Count - 1 do
         begin
-          if ((Clients.Items[j]as TStationR414).LinkedStation = nil)
-            and (Clients.Items[i] <> Clients.Items[j])
+          if (Clients.Items[j] is TStationR414) and ((Clients.Items[j] as TStationR414).LinkedStation = nil)
+            and (Clients.Items[i] is TStationR414) and ((Clients.Items[i] as TStationR414).LinkedStation = nil)
             and (i <> j) then
           begin
             Section.Enter;
@@ -256,16 +272,51 @@ implementation
             SendTypeStation((Clients.Items[i] as TStationR414));
 
             SendUserNameLinkedStation((Clients.Items[j] as TStationR414));
-
             SendUserNameLinkedStation((Clients.Items[i] as TStationR414));
 
+            onUpdateStationR414((Clients.Items[i] as TStationR414));
             onUpdateStationR414((Clients.Items[j] as TStationR414));
+
+            Section.Leave;
+            Break;
+          end
+          //св€зывание с кроссом
+          else if (Clients.Items[j] is TCross) and ((Clients.Items[j] as TCross).LinkedStation = nil)
+            and (Clients.Items[i] is TStationR414) and ((Clients.Items[i] as TStationR414).Cross = nil)
+            and (i <> j) then
+          begin
+            Section.Enter;
+
+            (Clients.Items[i] as TStationR414).Cross :=
+              (Clients.Items[j] as TCross);
+            (Clients.Items[j] as TCross).LinkedStation :=
+              (Clients.Items[i] as TStationR414);
+
+            //сообщение с ником дл€ станции
+            Request := TRequest.Create;
+            Request.Name := REQUEST_NAME_STATION_PARAMS;
+            Request.AddKeyValue(KEY_TYPE, CLIENT_CROSS);
+            Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
+            Request.AddKeyValue(KEY_USERNAME, (Clients.Items[i] as TStationR414).Cross.UserName);
+            (Clients.Items[i] as TStationR414).SendMessage(Request);
+            Request.Destroy;
+
+            //сообщение с ником дл€ скросса
+            Request := TRequest.Create;
+            Request.Name := REQUEST_NAME_STATION_PARAMS;
+            Request.AddKeyValue(KEY_TYPE, CLIENT_STATION_R414);
+            Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
+            Request.AddKeyValue(KEY_USERNAME, (Clients.Items[j] as TCross).LinkedStation.UserName);
+            (Clients.Items[j] as TCross).SendMessage(Request);
+            Request.Destroy;
+
+
+            onUpdateStationR414((Clients.Items[j] as TCross));
             onUpdateStationR414((Clients.Items[i] as TStationR414));
 
             Section.Leave;
             Break;
           end;
-        end;
       end;
     end;
   end;
