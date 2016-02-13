@@ -3,14 +3,267 @@ unit uHandlerCrossDM;
 interface
 
 uses
- uCrossDM,
- uHandlerClientDM;
+  uClientDM,
+  Generics.Collections,
+  IdTCPConnection,
+  SyncObjs,
+  SysUtils,
+  uRequestDM,
+  uCrossDM,
+  uHandlerClientDM;
 
 type
+
   THandlerCross = class (THandlerClient)
+    private
+        FOnAddCross: TAddRemoveUpdateClientEvent;
+        FOnRemoveCross: TAddRemoveUpdateClientEvent;
+        FonUpdateCross: TAddRemoveUpdateClientEvent;
+        procedure FindLinkedStation;
+    public
+        function RegistrationClient(Request: TRequest;Connection: TIdTCPConnection): Boolean;
+        function RemoveClient(Connection: TIdTCPConnection):Boolean;
+        procedure SendDisconnectClient(Cross: TCross);
+        function FindByConnection (Connection: TIdTCPConnection): TCross;
+        procedure Update;
+        procedure SendUserNameToStation(Station: TClient);
+        procedure SendUserNameToCross(Cross: TCross);
+        procedure SendTextMessageLinkedStation(Cross: TCross; txtMeessage:string);
+        procedure sendSetUstSvaziLinkedStation(Cross: TCross; ustSvaz: string);
+        property onAddCross: TAddRemoveUpdateClientEvent
+          read FOnAddCross
+          write FOnAddCross;
+        property onRemoveCross: TAddRemoveUpdateClientEvent
+          read FOnRemoveCross
+          write FOnRemoveCross;
+        property onUpdateCross: TAddRemoveUpdateClientEvent
+          read FonUpdateCross
+          write FonUpdateCross;
 
   end;
 
 implementation
 
-end.
+uses
+uStationR414DM;
+
+
+  procedure THandlerCross.sendSetUstSvaziLinkedStation(Cross: TCross; ustSvaz: string);
+  var Request: TRequest;
+  begin
+   if Cross <> nil then
+    begin
+      Request := TRequest.Create;
+      Request.Name := REQUEST_NAME_UST_SVAZI;
+      Request.AddKeyValue(KEY_TYPE, 'r415');            // Тип клиента
+
+      Request.AddKeyValue(KEY_SVAZ_SET, ustSvaz);
+
+      if Cross.LinkedStation <> nil then
+      begin
+        Cross.LinkedStation.SendMessage(Request);
+      end;
+      Request.Destroy;
+    end;
+  end;
+
+
+    /// <summary>
+  /// Передает клиенту текстовое сообщение для чата
+  /// </summary>
+  /// <param name="StationR415">Объект класса TStationR415.</param>
+  /// <param name="txtMeessage">Текстовое сообщение для отправки</param>
+  procedure THandlerCross.SendTextMessageLinkedStation(Cross: TCross; txtMeessage:string);
+  var Request: TRequest;
+  begin
+    if Cross <> nil then
+    begin
+      Request := TRequest.Create;
+      Request.Name := REQUEST_NAME_TEXT_MESSAGE;
+      Request.AddKeyValue(KEY_TYPE, 'r415');            // Тип клиента
+
+      Request.AddKeyValue(KEY_TEXT,txtMeessage);        // Наши ключ и значение
+      if Cross.LinkedStation <> nil then
+      begin
+        Cross.LinkedStation.SendMessage(Request);
+      end;
+      Request.Destroy;
+    end;
+  end;
+
+
+
+    /// <summary>
+  /// Сообщение с ником станции для кросса
+  /// </summary>
+  /// <param name="StationR415">Объект класса TStationR415.</param>
+  procedure THandlerCross.SendUserNameToCross(Cross: TCross);
+  var Request: TRequest;
+  begin
+    if ((Cross <> nil) and (Cross.LinkedStation <> nil)) then
+    begin
+      Request := TRequest.Create;
+      Request.Name := REQUEST_NAME_STATION_PARAMS;
+      Request.AddKeyValue(KEY_TYPE, CLIENT_STATION_R414);
+      Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
+      Request.AddKeyValue(KEY_USERNAME, (Cross.LinkedStation as TStationR414).UserName);
+      Cross.SendMessage(Request);
+      Request.Destroy;
+    end;
+  end;
+
+      /// <summary>
+  /// Сообщение с ником кросса для станции
+  /// </summary>
+  /// <param name="StationR415">Объект класса TStationR415.</param>
+    procedure THandlerCross.SendUserNameToStation(Station: TClient);
+  var Request: TRequest;
+  begin
+    if ((Station <> nil) and (Station as TStationR414).Cross <> nil) then
+    begin
+      Request := TRequest.Create;
+      Request.Name := REQUEST_NAME_STATION_PARAMS;
+      Request.AddKeyValue(KEY_TYPE, CLIENT_CROSS);
+      Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
+      Request.AddKeyValue(KEY_USERNAME, (Station as TStationR414).Cross.UserName);
+      (Station as TStationR414).SendMessage(Request);
+      Request.Destroy;
+    end;
+  end;
+
+
+    /// <summary>
+  /// Ищет не связанные станции и производит их связывание.
+  /// </summary>
+  procedure THandlerCross.FindLinkedStation;
+  var
+    i, j: Integer;
+  begin
+    for i := 0 to Count - 1 do
+    begin
+        for j := 0 to Count - 1 do
+        begin
+          if (Clients.Items[j] is TStationR414) and ((Clients.Items[j] as TStationR414).Cross = nil)
+            and (Clients.Items[i] is TCross) and ((Clients.Items[i] as TCross).LinkedStation = nil)
+            and (i <> j) then
+          begin
+            Section.Enter;
+
+            (Clients.Items[j] as TStationR414).Cross :=
+              (Clients.Items[i] as TCross);
+            (Clients.Items[i] as TCross).LinkedStation :=
+              (Clients.Items[j] as TStationR414);
+
+            SendUserNameToStation(Clients.Items[j] as TStationR414);
+            SendUserNameToCross(Clients.Items[i] as TCross);
+
+            onUpdateCross((Clients.Items[j] as TStationR414));
+            onUpdateCross((Clients.Items[i] as TCross));
+
+            Section.Leave;
+            Break;
+          end;
+      end;
+    end;
+  end;
+
+  /// <summary>
+  /// Производит обновление.
+  /// </summary>
+  procedure THandlerCross.Update;
+  begin
+    FindLinkedStation;
+  end;
+
+     /// <summary>
+  /// Передает станции сообщение о отключении кросса.
+  /// </summary>
+  /// <param name="StationR415">Объект класса TStationR415.</param>
+  procedure THandlerCross.SendDisconnectClient(Cross: TCross);
+  var
+    Request: TRequest;
+  begin
+    Request := TRequest.Create;
+    Request.Name := REQUEST_NAME_STATION_PARAMS;
+    Request.AddKeyValue(KEY_TYPE, CLIENT_CROSS);
+
+    Request.AddKeyValue(KEY_USERNAME, Cross.UserName);
+    Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_FALSE));
+    if Cross.LinkedStation <> nil then
+    begin
+      Cross.LinkedStation.SendMessage(Request);
+    end;
+  end;
+
+
+      /// <summary>
+  /// Производит поиск клиента по подключению.
+  /// </summary>
+  /// <param name="Connection">Объект класса TIdTCPConnection.</param>
+  function THandlerCross.FindByConnection (Connection: TIdTCPConnection):
+     TCross;
+  var
+    Client: TClient;
+  begin
+    Client := inherited FindByConnection(Connection);
+    if Client <> nil then
+    begin
+      Exit((Client as TCross))
+    end;
+    Exit(nil);
+  end;
+
+
+    /// <summary>
+  /// Производит удаление кросса из списка.
+  /// </summary>
+  /// <param name="Connection">Объект класса TIdTCPConnection.</param>
+  function THandlerCross.RemoveClient(Connection: TIdTCPConnection):
+    Boolean;
+  var
+    bCross: TCross;
+  begin
+    bCross := FindByConnection(Connection);
+    if bCross <> nil then
+    begin
+      if bCross.LinkedStation <> nil then
+      begin
+        (bCross.LinkedStation as TStationR414).Cross := nil;
+        SendDisconnectClient(bCross);
+        onUpdateCross(bCross.LinkedStation);
+      end;
+
+      onRemoveCross(bCross);
+      Clients.Remove(bCross);
+      Update;
+      Exit(True);
+    end;
+    Exit(False);
+  end;
+
+  function THandlerCross.RegistrationClient(Request: TRequest;
+    Connection: TIdTCPConnection): Boolean;
+  var
+    cross: TCross;
+    Name: string;
+  begin
+    Name := Request.GetValue('username');
+    cross := TCross.Create;
+    if (Connection <> nil)
+      and (Length(Name) > 0)
+      and (CheckUserName(Name)) then
+    begin
+      cross.UserName := Name;
+      cross.Connection := Connection;
+      Clients.Add(cross);
+      SendOkClient(cross);
+      onAddCross(cross);
+      Update;
+      Exit(True);
+
+    end;
+    Exit(False);
+  end;
+
+
+  end.

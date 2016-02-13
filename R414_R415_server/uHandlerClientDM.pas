@@ -14,8 +14,10 @@ type
     protected
        Section: TCriticalSection;
        Clients: TList<TClient>;
+
     public
-      constructor Create;
+
+      constructor Create(Clients1: TList<TClient>);
       function FindByConnection(Connection: TIdTCPConnection): TClient;
         overload;
       function CheckUserName(Name: string): Boolean;
@@ -24,7 +26,6 @@ type
       property Count: Integer read GetCount;
       function GetClient(Index: Integer): TClient;
       procedure SendOkClient(Client: TClient);
-      procedure Clear;
   end;
 
 implementation
@@ -32,19 +33,12 @@ implementation
   /// <summary>
   /// Конструктор.
   /// </summary>
-  constructor THandlerClient.Create;
+  constructor THandlerClient.Create(Clients1: TList<TClient>);
   begin
-    Clients := TList<TClient>.Create;
+    Clients := Clients1;
     Section := TCriticalSection.Create;
   end;
 
-  /// <summary>
-  /// Очистка списка списка станций.
-  /// </summary>
-  procedure THandlerClient.Clear;
-  begin
-    Clients.Clear;
-  end;
 
   /// <summary>
   /// Передает клиенту сообщение о успешном выполнении операции.
@@ -85,11 +79,12 @@ implementation
   var
     i:Integer;
   begin
-    for i := 0 to Count - 1 do
+    for i := 0 to self.Count - 1 do
     begin
       if Clients.Items[i].UserName = Name then
         Exit(False);
     end;
+
     Exit(True);
   end;
 
@@ -131,6 +126,5 @@ implementation
       Exit(nil);
     end;
   end;
-
 
 end.

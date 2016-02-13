@@ -12,15 +12,27 @@ const
   REQUEST_NAME_REGISTRATION = 'registration';
   REQUEST_NAME_GET_ALL_STATIONS = 'getallstations';
   REQUEST_NAME_STATION_PARAMS = 'params';
-  REQUEST_NAME_MESSAGE = 'message';
+  REQUEST_NAME_TEXT_MESSAGE = 'message';
+  REQUEST_NAME_WAVES = 'wave';
+  REQUEST_NAME_UST_SVAZI = 'svaz';
+  REQ_NAME_GEN_ACT = 'gener';
+
+  REQUEST_NAME_GEN_ACT = 'gener';
+  REQ_NAME_FINISH_ACT = 'finish';
+  KEY_FINISH = 'finish';
 
   KEY_TYPE = 'type';
   KEY_USERNAME = 'username';
   KEY_CONNECTED = 'connected';
   KEY_STATUS = 'status';
+  KEY_TEXT = 'txt';
+  KEY_SVAZ_SET = 'set';
+  KEY_GENERATE = 'state';
   KEY_CONNECTED_FALSE = false;
   KEY_CONNECTED_TRUE = true;
-  KEY_MESSAGE = 'messageText';
+
+  KEY_TRANSMITTER_WAVE_A = 'twavea';
+  KEY_RECEIVER_WAVE_A = 'rwavea';
 
   VALUE_SERVER = 'server';
 type

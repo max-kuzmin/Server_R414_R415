@@ -6,6 +6,7 @@ uses
   IdContext,
   IdTCPStream,
   SyncObjs,
+  SysUtils,
   IdTCPConnection,
   Generics.Collections,
   uClientDM,
@@ -19,7 +20,7 @@ uses
   uHandlerCrossDM,
   uStationR414DM,
   uStationR415DM,
-  uCrossDM;
+  uCrossDM,Dialogs;
 
 
 type
@@ -40,6 +41,8 @@ type
 
       Section: TCriticalSection;
       TCPServer: TIdTCPServer;
+
+      Clients: TList<TClient>;
 
       procedure ServerConnect(AContext: TIdContext);
       procedure ServerDisconnect(AContext: TIdContext);
@@ -65,9 +68,9 @@ type
       function ReadMaxConnections: Integer;
       procedure WriteMaxConnections(Value: Integer);
 
-      procedure DoOnStationR414(StationR414: TStationR414);
-      procedure DoOnRemoveStationR414(StationR414: TStationR414);
-      procedure DoOnUpdateStationR414(StationR414: TStationR414);
+      procedure DoOnAddClient(Client: TClient);
+      procedure DoOnRemoveClient(Client: TClient);
+      procedure DoOnUpdateClient(Client: TClient);
 
       property Port: Integer read ReadPort write WritePort;
       property MaxConnections: Integer read ReadMaxConnections
@@ -103,16 +106,27 @@ implementation
     Section := TCriticalSection.Create;
 
     Connections := TList<TIdTCPConnection>.Create;
+    Clients:= TList<TClient>.Create();
 
-    HandlerStationR414 := THandlerStationR414.Create;
+    HandlerStationR414 := THandlerStationR414.Create(Clients);
+    HandlerStationR415 := THandlerStationR415.Create(Clients);
+    HandlerCross := THandlerCross.Create(Clients);
 
     TCPServer.OnConnect := ServerConnect;
     TCPServer.OnDisconnect := ServerDisconnect;
     TCPServer.OnExecute := ServerExecute;
 
-    HandlerStationR414.onAddStationR414 := DoOnStationR414;
-    HandlerStationR414.onRemoveStationR414 := DoOnRemoveStationR414;
-    HandlerStationR414.onUpdateStationR414 := DoOnUpdateStationR414;
+    HandlerStationR414.onAddStationR414 := DoOnAddClient;
+    HandlerStationR414.onRemoveStationR414 := DoOnRemoveClient;
+    HandlerStationR414.onUpdateStationR414 := DoOnUpdateClient;
+
+    HandlerStationR415.onAddStationR415 := DoOnAddClient;
+    HandlerStationR415.onRemoveStationR415 := DoOnRemoveClient;
+    HandlerStationR415.onUpdateStationR415 := DoOnUpdateClient;
+
+    HandlerCross.onAddCross := DoOnAddClient;
+    HandlerCross.onRemoveCross := DoOnRemoveClient;
+    HandlerCross.onUpdateCross := DoOnUpdateClient;
   end;
 
   /// <summary>
@@ -149,32 +163,41 @@ implementation
     Exit(TCPServer.MaxConnections);
   end;
 
+
   /// <summary>
   /// Вызывает событие onAddClient.
   /// </summary>
-  /// <param name="StationR414">Объект класса TStationR414.</param>
-  procedure TServer.DoOnStationR414(StationR414: TStationR414);
+  /// <param name="StationR415">Объект класса TStationR415.</param>
+  procedure TServer.DoOnAddClient(Client: TClient);
   begin
-    onAddClient(StationR414, nil, nil);
+    if (Client is TStationR414) then onAddClient(Client as TStationR414, nil, nil)
+    else if (Client is TStationR415) then onAddClient(nil, Client as TStationR415, nil)
+    else  if (Client is TCross) then onAddClient(nil, nil, Client as TCross);
   end;
+
 
   /// <summary>
   /// Вызывает событие onRemoveClient.
   /// </summary>
-  /// <param name="StationR414">Объект класса TStationR414.</param>
-  procedure TServer.DoOnRemoveStationR414(StationR414: TStationR414);
+  /// <param name="StationR415">Объект класса TClient.</param>
+  procedure TServer.DoOnRemoveClient(Client: TClient);
   begin
-    onRemoveClient(StationR414, nil, nil);
+    if (Client is TStationR414) then onRemoveClient(Client as TStationR414, nil, nil)
+    else if (Client is TStationR415) then onRemoveClient(nil, Client as TStationR415, nil)
+    else  if (Client is TCross) then onRemoveClient(nil, nil, Client as TCross);
   end;
 
   /// <summary>
   /// Вызывает событие onUpdateClient.
   /// </summary>
-  /// <param name="StationR414">Объект класса TStationR414.</param>
-  procedure TServer.DoOnUpdateStationR414(StationR414: TStationR414);
+  /// <param name="StationR414">Объект класса TClient.</param>
+  procedure TServer.DoOnUpdateClient(Client: TClient);
   begin
-    onUpdateClient(StationR414, nil, nil);
+    if (Client is TStationR414) then onUpdateClient(Client as TStationR414, nil, nil)
+    else if (Client is TStationR415) then onUpdateClient(nil, Client as TStationR415, nil)
+    else  if (Client is TCross) then onUpdateClient(nil, nil, Client as TCross);
   end;
+
 
   /// <summary>
   /// Отправляет сообщение клиенту.
@@ -245,7 +268,7 @@ implementation
   /// </summary>
   procedure TServer.Clear;
   begin
-    HandlerStationR414.Clear;
+    Clients.Clear;
   end;
 
   /// <summary>
@@ -276,6 +299,8 @@ implementation
   procedure TServer.ServerDisconnect(AContext: TIdContext);
   begin
     HandlerStationR414.RemoveClient(AContext.Connection);
+    HandlerStationR415.RemoveClient(AContext.Connection);
+    HandlerCross.RemoveClient(AContext.Connection);
   end;
 
   /// <summary>
@@ -330,7 +355,20 @@ implementation
          if HandlerStationR414.RegistrationClient(Request, Connection) then
         Exit;
       end;
+
+      if ClientType = CLIENT_STATION_R415 then
+      begin
+        if HandlerStationR415.RegistrationClient(Request, Connection) then
+        Exit;
+      end;
+
+      if ClientType = CLIENT_CROSS then
+      begin
+        if HandlerCross.RegistrationClient(Request, Connection) then
+        Exit;
+      end;
     end;
+
     Response.Name := REQUEST_NAME_ERROR;
     SendMessage(Connection, Response);
   end;
@@ -344,7 +382,7 @@ implementation
     StrRequest : string);
   var
     Request, Response: TRequest;
-    PairedStationR414: TStationR414;
+	PairedStationR414: TStationR414;
   begin
     if Length(StrRequest) > 0 then
     begin
@@ -357,7 +395,8 @@ implementation
         begin
           RegisterClient(Connection, Request);
         end
-        else if(Request.Name = REQUEST_NAME_STATION_PARAMS) then
+        else
+        if(Request.Name = REQUEST_NAME_STATION_PARAMS) then
         begin
           if not (HandlerStationR414.SendParamsLinkedStationByHeadConnection(Connection,
             Request)) then
@@ -370,16 +409,65 @@ implementation
         begin
           SendMessage(Connection, HandlerStationR414.GetAllClients);
         end
-        else if (Request.Name = REQUEST_NAME_MESSAGE) then
+        else
+        //обработка текстового сообщения для чата
+        if Request.Name = REQUEST_NAME_TEXT_MESSAGE then
         begin
-        Response.Name:= REQUEST_NAME_MESSAGE;
-        Response.AddKeyValue(KEY_MESSAGE, Request.GetValue(KEY_MESSAGE));
-               PairedStationR414:= HandlerStationR414.FindByConnection(Connection).LinkedStation;
-               if not (PairedStationR414 = nil) then  begin
-                 SendMessage(PairedStationR414, Request);
-               end;
+          HandlerStationR415.SendTextMessageLinkedStation(
+            HandlerStationR415.FindByConnection(Connection),
+            Request.GetValue(KEY_TEXT));
+        end
+        else
+        //обработка пересылки волн
+        if Request.Name = REQUEST_NAME_WAVES then
+        begin
+          HandlerStationR415.SendWavesLinkedStation(
+            HandlerStationR415.FindByConnection(Connection),
+            Request.GetValue(KEY_TRANSMITTER_WAVE_A),
+            Request.GetValue(KEY_RECEIVER_WAVE_A));
+        end
+        else
+        //пересылка готовности ко вхождению в связь
+        if Request.Name = REQUEST_NAME_UST_SVAZI then
+        begin
+          HandlerStationR415.sendSetUstSvaziLinkedStation(
+            HandlerStationR415.FindByConnection(Connection),
+            Request.GetValue(KEY_SVAZ_SET)
+            );
+        end
+        else
 
-        end;
+        if Request.Name = REQUEST_NAME_GEN_ACT then
+        begin
+          HandlerStationR415.sendStateOfGenerate(
+            HandlerStationR415.FindByConnection(Connection),
+            Request.GetValue(KEY_GENERATE));
+        end
+        else
+
+        if Request.Name =   REQ_NAME_GEN_ACT  then
+        begin
+
+        end
+        else
+
+        if Request.Name = REQ_NAME_FINISH_ACT then
+        begin
+          HandlerStationR415.IsFinished(
+            HandlerStationR415.FindByConnection(Connection),
+            Request.GetValue(KEY_FINISH));
+        end
+		
+		else if (Request.Name = REQUEST_NAME_TEXT_MESSAGE) then
+        begin
+			Response.Name:= REQUEST_NAME_TEXT_MESSAGE;
+			Response.AddKeyValue(KEY_TEXT, Request.GetValue(KEY_TEXT));
+			PairedStationR414:= HandlerStationR414.FindByConnection(Connection).LinkedStation;
+			if not (PairedStationR414 = nil) then  begin
+					 SendMessage(PairedStationR414, Request);
+			end;
+		end;
+
       except
 
       end;
