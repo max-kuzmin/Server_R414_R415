@@ -14,11 +14,14 @@ type
     private
       FHead: Boolean;
       FLinkedStation : TClient;
+      FLinkedCross : TCross;
 
     public
       property Head: Boolean read FHead write FHead;
       property LinkedStation : TClient read FLinkedStation
         write FLinkedStation;
+      property LinkedCross : TCross read FLinkedCross
+        write FLinkedCross;
 
   end;
 

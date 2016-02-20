@@ -302,7 +302,7 @@ implementation
     Client: TClient;
   begin
     Client := inherited FindByConnection(Connection);
-    if Client <> nil then
+    if ((Client <> nil) and (Client is TStationR415)) then
     begin
       Exit((Client as TStationR415))
     end;

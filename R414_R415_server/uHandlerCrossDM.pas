@@ -28,6 +28,7 @@ type
         procedure Update;
         procedure SendUserNameToStation(Station: TClient);
         procedure SendUserNameToCross(Cross: TCross);
+        procedure SendUserNameAnotherCrossToCross(Cross: TCross);
         procedure SendTextMessageLinkedStation(Cross: TCross; txtMeessage:string);
         procedure sendSetUstSvaziLinkedStation(Cross: TCross; ustSvaz: string);
         property onAddCross: TAddRemoveUpdateClientEvent
@@ -96,7 +97,6 @@ uStationR414DM;
     /// <summary>
   /// Сообщение с ником станции для кросса
   /// </summary>
-  /// <param name="StationR415">Объект класса TStationR415.</param>
   procedure THandlerCross.SendUserNameToCross(Cross: TCross);
   var Request: TRequest;
   begin
@@ -115,11 +115,10 @@ uStationR414DM;
       /// <summary>
   /// Сообщение с ником кросса для станции
   /// </summary>
-  /// <param name="StationR415">Объект класса TStationR415.</param>
     procedure THandlerCross.SendUserNameToStation(Station: TClient);
   var Request: TRequest;
   begin
-    if ((Station <> nil) and (Station as TStationR414).Cross <> nil) then
+    if ((Station <> nil) and ((Station as TStationR414).Cross <> nil)) then
     begin
       Request := TRequest.Create;
       Request.Name := REQUEST_NAME_STATION_PARAMS;
@@ -127,6 +126,26 @@ uStationR414DM;
       Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
       Request.AddKeyValue(KEY_USERNAME, (Station as TStationR414).Cross.UserName);
       (Station as TStationR414).SendMessage(Request);
+      Request.Destroy;
+    end;
+  end;
+
+
+  /// <summary>
+  /// Сообщение с ником чужого кросса для кросса
+  /// </summary>
+
+    procedure THandlerCross.SendUserNameAnotherCrossToCross(Cross: TCross);
+  var Request: TRequest;
+  begin
+    if ((Cross <> nil) and (Cross.LinkedCross <> nil)) then
+    begin
+      Request := TRequest.Create;
+      Request.Name := REQUEST_NAME_STATION_PARAMS;
+      Request.AddKeyValue(KEY_TYPE, CLIENT_CROSS);
+      Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_TRUE));
+      Request.AddKeyValue(KEY_USERNAME, (Cross.LinkedCross as TCross).UserName);
+      Cross.SendMessage(Request);
       Request.Destroy;
     end;
   end;
@@ -141,8 +160,8 @@ uStationR414DM;
   begin
     for i := 0 to Count - 1 do
     begin
-        for j := 0 to Count - 1 do
-        begin
+      for j := 0 to Count - 1 do
+      begin
           if (Clients.Items[j] is TStationR414) and ((Clients.Items[j] as TStationR414).Cross = nil)
             and (Clients.Items[i] is TCross) and ((Clients.Items[i] as TCross).LinkedStation = nil)
             and (i <> j) then
@@ -153,6 +172,16 @@ uStationR414DM;
               (Clients.Items[i] as TCross);
             (Clients.Items[i] as TCross).LinkedStation :=
               (Clients.Items[j] as TStationR414);
+
+            //связываем кроссы двух станций
+            if (((Clients.Items[j] as TStationR414).LinkedStation<>nil) and ((Clients.Items[j] as TStationR414).LinkedStation.Cross<>nil)) then
+            begin
+              (Clients.Items[i] as TCross).LinkedCross := ((Clients.Items[j] as TStationR414).LinkedStation.Cross as TCross);
+              ((Clients.Items[j] as TStationR414).LinkedStation.Cross as TCross).LinkedCross:= (Clients.Items[i] as TCross);
+              SendUserNameAnotherCrossToCross(Clients.Items[i] as TCross);
+              onUpdateCross((Clients.Items[i] as TCross).LinkedCross);
+            end;
+
 
             SendUserNameToStation(Clients.Items[j] as TStationR414);
             SendUserNameToCross(Clients.Items[i] as TCross);
@@ -175,8 +204,8 @@ uStationR414DM;
     FindLinkedStation;
   end;
 
-     /// <summary>
-  /// Передает станции сообщение о отключении кросса.
+  /// <summary>
+  /// Передает станции сообщение об отключении кросса.
   /// </summary>
   /// <param name="StationR415">Объект класса TStationR415.</param>
   procedure THandlerCross.SendDisconnectClient(Cross: TCross);
@@ -206,7 +235,7 @@ uStationR414DM;
     Client: TClient;
   begin
     Client := inherited FindByConnection(Connection);
-    if Client <> nil then
+    if ((Client <> nil) and (Client is TCross)) then
     begin
       Exit((Client as TCross))
     end;

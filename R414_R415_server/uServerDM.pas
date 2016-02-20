@@ -382,7 +382,9 @@ implementation
     StrRequest : string);
   var
     Request, Response: TRequest;
-	PairedStationR414: TStationR414;
+	Paired: TClient;
+  ClientR414: TStationR414;
+  ClientCross: TCross;
   begin
     if Length(StrRequest) > 0 then
     begin
@@ -413,9 +415,65 @@ implementation
         //обработка текстового сообщения для чата
         if Request.Name = REQUEST_NAME_TEXT_MESSAGE then
         begin
-          HandlerStationR415.SendTextMessageLinkedStation(
-            HandlerStationR415.FindByConnection(Connection),
-            Request.GetValue(KEY_TEXT));
+
+            
+            if (HandlerStationR415.FindByConnection(Connection) <> nil) then
+            begin
+                 HandlerStationR415.SendTextMessageLinkedStation(
+                HandlerStationR415.FindByConnection(Connection),
+                Request.GetValue(KEY_TEXT));
+            end
+            
+            else if (HandlerStationR414.FindByConnection(Connection)<> nil) then
+            begin
+                  ClientR414 := HandlerStationR414.FindByConnection(Connection);
+                 if (ClientR414.LinkedStation<>nil) and (Request.GetValue(KEY_USERNAME_TO) = ClientR414.LinkedStation.UserName) then
+                    begin
+
+                    Paired:= ClientR414.LinkedStation;
+
+                   if not (Paired = nil) then 
+                    begin
+                      SendMessage(Paired, Request);
+                   end;
+                 end
+                 else  if (ClientR414.Cross <> nil) and (Request.GetValue(KEY_USERNAME_TO) = ClientR414.Cross.UserName) then
+                    begin
+
+                   Paired:= ClientR414.Cross;
+
+                   if not (Paired = nil) then  begin
+                      SendMessage(Paired, Request);
+                   end;
+                 end;
+
+
+            end
+            else if (HandlerCross.FindByConnection(Connection)<> nil) then
+            begin
+                  ClientCross := HandlerCross.FindByConnection(Connection);
+                 if (ClientCross.LinkedStation<> nil) and (Request.GetValue(KEY_USERNAME_TO) = ClientCross.LinkedStation.UserName) then
+                     begin
+
+                        Paired:= ClientCross.LinkedStation;
+
+                       if not (Paired = nil) then 
+                        begin
+                          SendMessage(Paired, Request);
+                       end;
+                 end
+                  //отправка сообщения от кросса кроссу связанной станции
+                 else if (ClientCross.LinkedStation<> nil) and ((ClientCross.LinkedStation as TStationR414).Cross <> nil) and (Request.GetValue(KEY_USERNAME_TO) = (ClientCross.LinkedStation as TStationR414).Cross.UserName) then
+                 begin
+                       Paired:= (ClientCross.LinkedStation as TStationR414).Cross;
+                       if (Paired <> nil) then  SendMessage(Paired, Request);
+                 end;
+                      
+
+
+            end;
+
+
         end
         else
         //обработка пересылки волн
@@ -456,17 +514,8 @@ implementation
           HandlerStationR415.IsFinished(
             HandlerStationR415.FindByConnection(Connection),
             Request.GetValue(KEY_FINISH));
-        end
-		
-		else if (Request.Name = REQUEST_NAME_TEXT_MESSAGE) then
-        begin
-			Response.Name:= REQUEST_NAME_TEXT_MESSAGE;
-			Response.AddKeyValue(KEY_TEXT, Request.GetValue(KEY_TEXT));
-			PairedStationR414:= HandlerStationR414.FindByConnection(Connection).LinkedStation;
-			if not (PairedStationR414 = nil) then  begin
-					 SendMessage(PairedStationR414, Request);
-			end;
-		end;
+        end;
+
 
       except
 
