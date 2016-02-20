@@ -31,6 +31,9 @@ const
   KEY_CONNECTED_FALSE = false;
   KEY_CONNECTED_TRUE = true;
 
+  KEY_USERNAME_TO = 'usernameto';
+  KEY_USERNAME_FROM = 'usernamefrom';
+
   KEY_TRANSMITTER_WAVE_A = 'twavea';
   KEY_RECEIVER_WAVE_A = 'rwavea';
 

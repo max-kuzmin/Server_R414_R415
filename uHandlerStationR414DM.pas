@@ -37,8 +37,6 @@ type
       procedure SendDisconnectClient(StationR414: TStationR414);
       procedure SendUserNameLinkedStation(StationR414: TStationR414);
       procedure SendTypeStation(StationR414: TStationR414);
-        procedure SendChatMessage(StationR414:
-    TStationR414; Response: TRequest);
 
       property onAddStationR414: TAddRemoveUpdateClientEvent
         read FOnAddStationR414
@@ -129,7 +127,7 @@ uCrossDM;
     Client: TClient;
   begin
     Client := inherited FindByConnection(Connection);
-    if Client <> nil then
+    if ((Client <> nil) and (Client is TStationR414)) then
     begin
       Exit((Client as TStationR414))
     end;
@@ -214,7 +212,6 @@ uCrossDM;
   var
     bStationR414: TStationR414;
     Name: string;
-    ClientType: string;
   begin
     Name := Request.GetValue('username');
     bStationR414 := TStationR414.Create;
@@ -292,7 +289,7 @@ uCrossDM;
             (Clients.Items[j] as TCross).LinkedStation :=
               (Clients.Items[i] as TStationR414);
 
-            //сообщение с ником для станции
+            //сообщение с ником кросса для станции
             Request := TRequest.Create;
             Request.Name := REQUEST_NAME_STATION_PARAMS;
             Request.AddKeyValue(KEY_TYPE, CLIENT_CROSS);
@@ -301,7 +298,7 @@ uCrossDM;
             (Clients.Items[i] as TStationR414).SendMessage(Request);
             Request.Destroy;
 
-            //сообщение с ником для скросса
+            //сообщение с ником станции для кросса
             Request := TRequest.Create;
             Request.Name := REQUEST_NAME_STATION_PARAMS;
             Request.AddKeyValue(KEY_TYPE, CLIENT_STATION_R414);
@@ -310,7 +307,6 @@ uCrossDM;
             (Clients.Items[j] as TCross).SendMessage(Request);
             Request.Destroy;
 
-
             onUpdateStationR414((Clients.Items[j] as TCross));
             onUpdateStationR414((Clients.Items[i] as TStationR414));
 
@@ -318,19 +314,6 @@ uCrossDM;
             Break;
           end;
       end;
-    end;
-  end;
-
-      /// <summary>
-  /// Передает клиенту сообщение
-  /// </summary>
-  /// <param name="StationR414">Объект класса TStationR414.</param>
-  procedure THandlerStationR414.SendChatMessage(StationR414:
-    TStationR414; Response: TRequest);
-  begin
-    if StationR414 <> nil then
-    begin
-      StationR414.SendMessage(Response);
     end;
   end;
 
