@@ -382,6 +382,7 @@ implementation
     StrRequest : string);
   var
     Request, Response: TRequest;
+    Client: TClient;
 	Paired: TClient;
   ClientR414: TStationR414;
   ClientCross: TCross;
@@ -400,12 +401,43 @@ implementation
         else
         if(Request.Name = REQUEST_NAME_STATION_PARAMS) then
         begin
-          if not (HandlerStationR414.SendParamsLinkedStationByHeadConnection(Connection,
-            Request)) then
-            begin
-              Response.Name := REQUEST_NAME_ERROR;
-              SendMessage(Connection, Response);
-            end;
+             if (HandlerStationR414.FindByConnection(Connection) <> nil) then
+             begin
+
+                if (Request.GetValue(KEY_TYPE) = CLIENT_STATION_R414) or (Request.GetValue(KEY_TYPE) = CLIENT_STATION_R414_TASK) then
+                begin
+
+                  if (HandlerStationR414.SendParamsLinkedStationByConnection(Connection, Request)) then  Exit;
+
+                end
+                else if (Request.GetValue(KEY_TYPE) = CLIENT_CROSS) or (Request.GetValue(KEY_TYPE) = CLIENT_CROSS_TASK) then
+                begin
+
+                   if (HandlerStationR414.SendParamsLinkedCrossByConnection(Connection, Request)) then  Exit;
+
+                end;
+             end
+             else if (HandlerCross.FindByConnection(Connection) <> nil) then
+             begin
+               if (Request.GetValue(KEY_TYPE) = CLIENT_STATION_R414) or (Request.GetValue(KEY_TYPE) = CLIENT_STATION_R414_TASK) then
+                begin
+
+                  if (HandlerCross.SendParamsLinkedStationByConnection(Connection, Request)) then  Exit;
+
+                end
+                else if (Request.GetValue(KEY_TYPE) = CLIENT_CROSS) or (Request.GetValue(KEY_TYPE) = CLIENT_CROSS_TASK) then
+                begin
+
+                   if (HandlerCross.SendParamsLinkedCrossByConnection(Connection, Request)) then  Exit;
+
+                end;
+             end;
+
+
+
+
+             Response.Name := REQUEST_NAME_ERROR;
+                SendMessage(Connection, Response);
         end
         else if Request.Name = REQUEST_NAME_GET_ALL_STATIONS then
         begin
@@ -463,9 +495,9 @@ implementation
                        end;
                  end
                   //отправка сообщения от кросса кроссу связанной станции
-                 else if (ClientCross.LinkedStation<> nil) and ((ClientCross.LinkedStation as TStationR414).Cross <> nil) and (Request.GetValue(KEY_USERNAME_TO) = (ClientCross.LinkedStation as TStationR414).Cross.UserName) then
+                 else if (ClientCross.LinkedCross <> nil) and (Request.GetValue(KEY_USERNAME_TO) = ClientCross.LinkedCross.UserName) then
                  begin
-                       Paired:= (ClientCross.LinkedStation as TStationR414).Cross;
+                       Paired:= ClientCross.LinkedCross;
                        if (Paired <> nil) then  SendMessage(Paired, Request);
                  end;
                       
