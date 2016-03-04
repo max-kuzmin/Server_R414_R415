@@ -25,6 +25,12 @@ type
         function RemoveClient(Connection: TIdTCPConnection):Boolean;
         procedure SendDisconnectClient(Cross: TCross);
         function FindByConnection (Connection: TIdTCPConnection): TCross;
+
+        function SendParamsLinkedStationByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+        function SendParamsLinkedCrossByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+
         procedure Update;
         procedure SendUserNameToStation(Station: TClient);
         procedure SendUserNameToCross(Cross: TCross);
@@ -178,7 +184,11 @@ uStationR414DM;
             begin
               (Clients.Items[i] as TCross).LinkedCross := ((Clients.Items[j] as TStationR414).LinkedStation.Cross as TCross);
               ((Clients.Items[j] as TStationR414).LinkedStation.Cross as TCross).LinkedCross:= (Clients.Items[i] as TCross);
+
               SendUserNameAnotherCrossToCross(Clients.Items[i] as TCross);
+              onUpdateCross(Clients.Items[i] as TCross);
+
+              SendUserNameAnotherCrossToCross((Clients.Items[i] as TCross).LinkedCross);
               onUpdateCross((Clients.Items[i] as TCross).LinkedCross);
             end;
 
@@ -218,9 +228,14 @@ uStationR414DM;
 
     Request.AddKeyValue(KEY_USERNAME, Cross.UserName);
     Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_FALSE));
+
     if Cross.LinkedStation <> nil then
     begin
       Cross.LinkedStation.SendMessage(Request);
+    end;
+    if Cross.LinkedCross <> nil then
+    begin
+      Cross.LinkedCross.SendMessage(Request);
     end;
   end;
 
@@ -241,6 +256,53 @@ uStationR414DM;
     end;
     Exit(nil);
   end;
+
+
+
+    /// <summary>
+  /// Передает данные станции.
+  /// </summary>
+  /// <param name="Connection">Объект класса TIdTCPConnection.</param>
+  /// <param name="Request">Запрос полученный от главной станции.</param>
+  function THandlerCross.SendParamsLinkedStationByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+  var
+    Cross: TCross;
+  begin
+    Cross := FindByConnection(Connection);
+    if (Cross <> nil)
+      and (Cross.LinkedStation <> nil)
+      then
+    begin
+      Cross.LinkedStation.SendMessage(Request);
+      Exit(True);
+    end;
+    Exit(False);
+  end;
+
+
+   /// <summary>
+  /// Передает данные кроссу.
+  /// </summary>
+  /// <param name="Connection">Объект класса TIdTCPConnection.</param>
+  /// <param name="Request">Запрос полученный от главной станции.</param>
+  function THandlerCross.SendParamsLinkedCrossByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+  var
+    Cross: TCross;
+  begin
+    Cross := FindByConnection(Connection);
+    if (Cross <> nil)
+      and (Cross.LinkedCross <> nil)
+      then
+    begin
+      Cross.LinkedCross.SendMessage(Request);
+      Exit(True);
+    end;
+    Exit(False);
+  end;
+
+
 
 
     /// <summary>

@@ -37,6 +37,10 @@ const
   KEY_TRANSMITTER_WAVE_A = 'twavea';
   KEY_RECEIVER_WAVE_A = 'rwavea';
 
+
+  CLIENT_STATION_R414_TASK = 'r414_task';
+  CLIENT_CROSS_TASK = 'cross_task';
+
   VALUE_SERVER = 'server';
 type
   TRequest = class

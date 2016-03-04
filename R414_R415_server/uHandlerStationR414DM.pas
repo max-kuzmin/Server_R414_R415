@@ -32,11 +32,15 @@ type
         Connection: TIdTCPConnection):
         Boolean;
       function RemoveClient(Connection: TIdTCPConnection): Boolean;
-      function SendParamsLinkedStationByHeadConnection
+      function SendParamsLinkedStationByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+        function SendParamsLinkedCrossByConnection
         (Connection: TIdTCPConnection; Request: TRequest): Boolean;
       procedure SendDisconnectClient(StationR414: TStationR414);
       procedure SendUserNameLinkedStation(StationR414: TStationR414);
       procedure SendTypeStation(StationR414: TStationR414);
+
+
 
       property onAddStationR414: TAddRemoveUpdateClientEvent
         read FOnAddStationR414
@@ -111,9 +115,15 @@ uCrossDM;
 
     Request.AddKeyValue(KEY_USERNAME, StationR414.UserName);
     Request.AddKeyValue(KEY_CONNECTED, BoolToStr(KEY_CONNECTED_FALSE));
+    
     if StationR414.LinkedStation <> nil then
     begin
       StationR414.LinkedStation.SendMessage(Request);
+    end;
+    
+    if StationR414.Cross <> nil then
+    begin
+      StationR414.Cross.SendMessage(Request);
     end;
   end;
 
@@ -185,7 +195,7 @@ uCrossDM;
   /// </summary>
   /// <param name="Connection">Объект класса TIdTCPConnection.</param>
   /// <param name="Request">Запрос полученный от главной станции.</param>
-  function THandlerStationR414.SendParamsLinkedStationByHeadConnection
+  function THandlerStationR414.SendParamsLinkedStationByConnection
         (Connection: TIdTCPConnection; Request: TRequest): Boolean;
   var
     StationR414: TStationR414;
@@ -197,6 +207,29 @@ uCrossDM;
       then
     begin
       StationR414.LinkedStation.SendMessage(Request);
+      Exit(True);
+    end;
+    Exit(False);
+  end;
+
+
+   /// <summary>
+  /// Передает данные от главной станции кроссу.
+  /// </summary>
+  /// <param name="Connection">Объект класса TIdTCPConnection.</param>
+  /// <param name="Request">Запрос полученный от главной станции.</param>
+  function THandlerStationR414.SendParamsLinkedCrossByConnection
+        (Connection: TIdTCPConnection; Request: TRequest): Boolean;
+  var
+    StationR414: TStationR414;
+  begin
+    StationR414 := FindByConnection(Connection);
+    if (StationR414 <> nil)
+      and (StationR414.Cross <> nil)
+      //and (StationR414.Head)
+      then
+    begin
+      StationR414.Cross.SendMessage(Request);
       Exit(True);
     end;
     Exit(False);
