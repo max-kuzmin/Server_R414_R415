@@ -43,6 +43,7 @@ type
       TCPServer: TIdTCPServer;
 
       Clients: TList<TClient>;
+      log: string;
 
       procedure ServerConnect(AContext: TIdContext);
       procedure ServerDisconnect(AContext: TIdContext);
@@ -386,10 +387,23 @@ implementation
 	Paired: TClient;
   ClientR414: TStationR414;
   ClientCross: TCross;
+  f:TextFile;
   begin
     if Length(StrRequest) > 0 then
     begin
       try
+
+          try
+              log:=log + TimeToStr(Now) +' --- ' + StrRequest + #10;
+              AssignFile(f, 'log.txt');
+              Rewrite(f);
+              Writeln(f, log);
+              CloseFile(f);
+          except
+
+          end;
+
+
         Response := TRequest.Create;
         Request := TRequest.Create;
         Request.ConvertToKeyValueList(StrRequest);
